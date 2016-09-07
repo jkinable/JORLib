@@ -35,6 +35,7 @@ import org.jgrapht.Graphs;
 import org.jgrapht.graph.DefaultEdge;
 import org.jgrapht.graph.SimpleDirectedGraph;
 import org.jgrapht.graph.SimpleGraph;
+import org.jorlib.alg.tsp.separation.SubtourCut;
 import org.jorlib.alg.tsp.separation.SubtourSeparator;
 
 /**
@@ -52,7 +53,7 @@ public final class SubtourSeparatorDemo {
 	public static void example1(){
 		//Define a new Undirected Graph. For simplicity we'll use a simple, unweighted graph, but in reality this class is mainly used
 		//in combination with weighted graphs for TSP problems.
-		Graph<Integer, DefaultEdge> undirectedGraph=new SimpleGraph<Integer, DefaultEdge>(DefaultEdge.class);
+		Graph<Integer, DefaultEdge> undirectedGraph=new SimpleGraph<>(DefaultEdge.class);
 		Graphs.addAllVertices(undirectedGraph, Arrays.asList(1,2,3,4,5,6));
 		undirectedGraph.addEdge(1, 2);
 		undirectedGraph.addEdge(2, 3);
@@ -65,7 +66,7 @@ public final class SubtourSeparatorDemo {
 		undirectedGraph.addEdge(3, 6);
 		
 		//Define the x_e values for every edge e\in E
-		Map<DefaultEdge, Double> edgeValueMap=new HashMap<DefaultEdge, Double>();
+		Map<DefaultEdge, Double> edgeValueMap=new HashMap<>();
 		edgeValueMap.put(undirectedGraph.getEdge(1,2), 0.0);
 		edgeValueMap.put(undirectedGraph.getEdge(2,3), 1.0);
 		edgeValueMap.put(undirectedGraph.getEdge(3,4), 0.0);
@@ -77,12 +78,14 @@ public final class SubtourSeparatorDemo {
 		edgeValueMap.put(undirectedGraph.getEdge(3,6), 1.0);
 		
 		//Invoke the separator
-		SubtourSeparator<Integer, DefaultEdge> separator=new SubtourSeparator<Integer, DefaultEdge>(undirectedGraph);
-		separator.separateSubtour(edgeValueMap);
-		
-		System.out.println("Has found a violated subtour: "+separator.hasSubtour());
-		System.out.println("Cut value: "+separator.getCutValue());
-		System.out.println("Cut set: "+separator.getCutSet());
+		SubtourSeparator<Integer, DefaultEdge> separator=new SubtourSeparator<>(undirectedGraph);
+		SubtourCut<Integer> subtour=separator.separateSubtour(edgeValueMap);
+
+		if(subtour!=null) {
+			System.out.println("Has found a violated subtour: ");
+			System.out.println("Cut value: " + subtour.getCutValue());
+			System.out.println("Cut set: " + subtour.getCutSet());
+		}
 		//The returned cut set is: {2,3,6}. This leads to the cut: \sum_{e\in \delta{2,3,6}} x_e >=2
 	}
 	
@@ -91,7 +94,7 @@ public final class SubtourSeparatorDemo {
 	 */
 	public static void example2(){
 		//Define a new Directed Graph. For simplicity we'll use a simple, unweighted graph.
-		Graph<Integer, DefaultEdge> directedGraph=new SimpleDirectedGraph<Integer, DefaultEdge>(DefaultEdge.class);
+		Graph<Integer, DefaultEdge> directedGraph=new SimpleDirectedGraph<>(DefaultEdge.class);
 		Graphs.addAllVertices(directedGraph, Arrays.asList(1,2,3,4,5,6));
 		directedGraph.addEdge(1, 2);
 		directedGraph.addEdge(2, 3);
@@ -106,7 +109,7 @@ public final class SubtourSeparatorDemo {
 		directedGraph.addEdge(3, 6);
 		
 		//Define the x_e values for every edge e\in E
-		Map<DefaultEdge, Double> edgeValueMap=new HashMap<DefaultEdge, Double>();
+		Map<DefaultEdge, Double> edgeValueMap=new HashMap<>();
 		edgeValueMap.put(directedGraph.getEdge(1,2), 0.0);
 		edgeValueMap.put(directedGraph.getEdge(2,3), 1.0);
 		edgeValueMap.put(directedGraph.getEdge(3,4), 0.0);
@@ -120,12 +123,14 @@ public final class SubtourSeparatorDemo {
 		edgeValueMap.put(directedGraph.getEdge(3,6), 1.0);
 		
 		//Invoke the separator
-		SubtourSeparator<Integer, DefaultEdge> separator=new SubtourSeparator<Integer, DefaultEdge>(directedGraph);
-		separator.separateSubtour(edgeValueMap);
-		
-		System.out.println("Has found a violated subtour: "+separator.hasSubtour());
-		System.out.println("Cut value: "+separator.getCutValue());
-		System.out.println("Cut set: "+separator.getCutSet());
+		SubtourSeparator<Integer, DefaultEdge> separator=new SubtourSeparator<>(directedGraph);
+		SubtourCut<Integer> subtour=separator.separateSubtour(edgeValueMap);
+
+		if(subtour!=null) {
+			System.out.println("Has found a violated subtour: ");
+			System.out.println("Cut value: " + subtour.getCutValue());
+			System.out.println("Cut set: " + subtour.getCutSet());
+		}
 		//The returned cut set is: {2,3,6}. This leads to the cut: \sum_{e\in \delta{2,3,6}} x_e >=2
 	}
 	

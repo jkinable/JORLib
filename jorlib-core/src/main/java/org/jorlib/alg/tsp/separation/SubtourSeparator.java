@@ -26,15 +26,13 @@
  */
 package org.jorlib.alg.tsp.separation;
 
-import java.util.Iterator;
-import java.util.LinkedHashSet;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 
 import org.jgrapht.Graph;
 import org.jgrapht.Graphs;
-import org.jgrapht.alg.MinSourceSinkCut;
 import org.jgrapht.alg.StoerWagnerMinimumCut;
+import org.jgrapht.alg.flow.PushRelabelMFImpl;
+import org.jgrapht.alg.interfaces.MinimumSTCutAlgorithm;
 import org.jgrapht.graph.DefaultWeightedEdge;
 import org.jgrapht.graph.SimpleWeightedGraph;
 
@@ -50,12 +48,9 @@ import org.jgrapht.graph.SimpleWeightedGraph;
  * Note: the graph must be provided as a JgraphT graph. The graph representing the problem can be directed, undirected, or mixed,
  * complete or incomplete, weighted or without weights. The directed graphs are often useful to model cases where a vehicle can only
  * drive from one city to the other in a particular direction.<p>
- * Note2: To separate the subtours, we rely on the StoerWagnerMinimumCut implementation from the JgraphT package. 
- * 		This implementation deterministically computes the minimum cut in a graph in {@code O(|V||E| + |V|log|V|)} time, see
- * 		{@literal M. Stoer and F. Wagner, "A Simple Min-Cut Algorithm", Journal of the ACM, volume 44, number 4. pp 585-591, 1997.}<p>
- * 
+ *
  * WARNING: if the input graph is modified, i.e. edges or vertices are added/removed then the behavior of this class is undefined!
- * 			A new instance should of this class should be made if this happens! A future extension of this class could add a graph
+ * 			A new instance of this class should be created if this happens! A future extension of this class could add a graph
  * 			listener.
  * 
  * @author Joris Kinable
@@ -77,10 +72,8 @@ public class SubtourSeparator<V, E> {
 	
 	/**
 	 * This method instantiates the Subtour Separator. The input can be any type of graph: directed, undirected, or mixed,
-	 * complete or incomplete, weighted or without weights. Internally, this class converts the given graph to a undirected graph. 
-	 * Multiple edges between two vertices i,j, for example two direct arc (i,j) and (j,i)) are aggregated into in undirected edge (i,j).
-	 * WARNING: if the input graph is modified, i.e. edges or vertices are added/removed then the behavior of this class is undefined!
-	 * 			A new instance should of this class should be made if this happens!
+	 * complete or incomplete, weighted or without weights. Internally, the given graph is converted to a undirected graph.
+	 * Multiple edges between two vertices i,j, for example two direct arcs (i,j) and (j,i)) are aggregated into an undirected edge (i,j).
 	 * @param inputGraph input graph
 	 */
 	public SubtourSeparator(Graph<V,E> inputGraph){
@@ -92,14 +85,14 @@ public class SubtourSeparator<V, E> {
 	}
 	
 	/**
-	 * Separates the most violated subtour. More precisely, this method calculates a cutset S' for which {@code \sum_{e\in \delta{S'}} w_e x_e} is minimized.
-	 * The method returns a {@link SeparatedSubtour} whenever \sum_{e\in \delta{S'}} w_e x_e <2, or {@code null} otherwise.
+	 * Separates the most violated subtour. More precisely, this method calculates a cutset S' for which {@code \sum_{e\in \delta{S'}} x_e} is minimized.
+	 * The method returns a {@link SubtourCut} whenever \sum_{e\in \delta{S'}} x_e <2, or {@code null} otherwise.
 	 * The implementation of this method relies on jgrapht's StoerWagnerMinimumCut implementation with runtime O(|V||E|log|E|).
 	 * @param edgeValueMap Mapping of edges to their corresponding values, i.e. the x_e variable values for all e \in E. It suffices to provide the values
 	 *                     of the non-zero edges. All other edges are presumed to have the value 0.
-	 *  @return Returns the most violated subtour S' whenever \sum_{e\in \delta{S'}} w_e x_e <2, or {@code null} otherwise.
+	 *  @return Returns the most violated subtour S' whenever \sum_{e\in \delta{S'}} x_e <2, or {@code null} otherwise.
 	 */
-	public SeparatedSubtour separateSubtour(Map<E, Double> edgeValueMap){
+	public SubtourCut<V> separateSubtour(Map<E, Double> edgeValueMap){
 		//Update the weights of our working graph
 		//a. Reset all weights to zero
 		for(DefaultWeightedEdge edge : workingGraph.edgeSet())
@@ -119,33 +112,33 @@ public class SubtourSeparator<V, E> {
 		StoerWagnerMinimumCut<V,DefaultWeightedEdge> mc= new StoerWagnerMinimumCut<>(workingGraph);
 		minCutValue=mc.minCutWeight();
 		cutSet=mc.minCut();
-		
-		//If the cut value is smaller than 2, a subtour constraint has been violated
 		hasSubtour= minCutValue<2-PRECISION;
-		if(minCutValue<2-PRECISION)
-			return new SeparatedSubtour(cutSet, minCutValue);
+
+		//If the cut value is smaller than 2, a subtour constraint has been violated
+		if(hasSubtour)
+			return new SubtourCut<>(cutSet, minCutValue);
 		else
 			return null;
 	}
 
 
 	/**
-	 * Separates at most {@code maxNumberOfSubtours} subtours. There are no guarantees given as to which subtours
+	 * Separates at most {@code maxNumberOfSubtours} subtour cuts. There are no guarantees given as to which subtour cuts
 	 * are returned, e.g., the subtour for which the cut value is minimal may not be contained in the set returned. This method does guarantee
 	 * to return an empty set whenever no violated subtours exist, i.e., when {@code\sum_{e\in \delta{S'}} w_e x_e >= 2 for all S'}.
 	 * The method attempts to find {@code maxNumberOfSubtours} subtours by selecting a source vertex v1 and iterating over
 	 * all other vertices v2. For each pair v1, v2, the method computes a minimum cut, thereby ensuring that v1 is on one side of the cut,
-	 * and v2 in the other. If the weight of the cut is less than 2, a new subtour has been found and added to the return set. The method
+	 * and v2 on the other. If the weight of the cut is less than 2, a new subtour cut has been found and added to the return set. The method
 	 * terminates as soon as {@code maxNumberOfSubtours} have been found, or whenever all pairs v1, v2 have been tested.
-	 * The implementation of this method relies on jgrapht's MinSourceSinkCut implementation with runtime O(V^3+E).
-	 * Runtime: O(V^4+EV).
+	 * The implementation of this method relies on jgrapht's Push Relabel Maximum Flow implementation with runtime O(V^3).
+	 * Runtime: O(V^4).
 	 *
 	 * @param edgeValueMap Mapping of edges to their corresponding values, i.e. the x_e variable values for all e \in E. It suffices to provide the values
 	 *                     of the non-zero edges. All other edges are presumed to have the value 0.
 	 * @param maxNumberOfSubtours The maximum number of subtours returned.
-	 *  @return Returns at most {@code maxNumberOfSubtours} subtours, or an empty list whenever there are no subtours.
+	 * @return Returns at most {@code maxNumberOfSubtours} subtour cuts, or an empty list whenever there are no subtours.
 	 */
-	public Set<SeparatedSubtour> separateSubtours(Map<E, Double> edgeValueMap, int maxNumberOfSubtours){
+	public Set<SubtourCut<V>> separateSubtours(Map<E, Double> edgeValueMap, int maxNumberOfSubtours){
 		//Update the weights of our working graph
 		//a. Reset all weights to zero
 		for(DefaultWeightedEdge edge : workingGraph.edgeSet())
@@ -161,28 +154,102 @@ public class SubtourSeparator<V, E> {
 			}
 		}
 
-		//c. Calculate the subtours
-		Set<SeparatedSubtour> separatedSubtours=new LinkedHashSet<>();
+//		System.out.println("Working graph:");
+//		for(DefaultWeightedEdge edge : workingGraph.edgeSet()){
+//			System.out.println(""+edge+" weight: "+workingGraph.getEdgeWeight(edge));
+//		}
 
-		MinSourceSinkCut<V, DefaultWeightedEdge> mssc=new MinSourceSinkCut<V, DefaultWeightedEdge>(workingGraph, PRECISION);
+		//c. Calculate the subtour cuts
+		Set<SubtourCut<V>> subtourCuts =new LinkedHashSet<>();
+
+		MinimumSTCutAlgorithm<V, DefaultWeightedEdge> mssc=new PushRelabelMFImpl<>(workingGraph, PRECISION);
 		Iterator<V> it=workingGraph.vertexSet().iterator();
 		V source=it.next();
 
-		while (it.hasNext() && separatedSubtours.size() < maxNumberOfSubtours){
+		while (it.hasNext() && subtourCuts.size() < maxNumberOfSubtours){
 			V target=it.next();
-			mssc.computeMinCut(source, target);
-			double cutWeight=mssc.getCutWeight();
+//			System.out.println("Target: "+target);
+			double cutWeight=mssc.calculateMinCut(source, target);
+//			System.out.println("cutWeight: "+cutWeight+" sourcePartition: "+mssc.getSourcePartition()+" sinkPartition: "+mssc.getSinkPartition());
 
-			//If the cut value is smaller than 2, a subtour constraint has been violated
+			//If the cut value is smaller than 2, a subtour cut has been found
 			if(cutWeight<2-PRECISION)
-				separatedSubtours.add(new SeparatedSubtour(mssc.getSourcePartition(), cutWeight));
+				subtourCuts.add(new SubtourCut<>(mssc.getSourcePartition(), cutWeight));
 		}
-		return separatedSubtours;
+		hasSubtour= !subtourCuts.isEmpty();
+		return subtourCuts;
+	}
+
+
+
+	/**
+	 * Separates the most violated subtour cuts. At most {@code maxNumberOfSubtours} subtour cuts are returned. This method returns
+	 * an empty set whenever no violated subtours exist, i.e., when {@code\sum_{e\in \delta{S'}} w_e x_e >= 2 for all S'}.
+	 * The method attempts to find {@code maxNumberOfSubtours} subtours by selecting a source vertex v1 and iterating over
+	 * all other vertices v2. For each pair v1, v2, the method computes a minimum cut, thereby ensuring that v1 is on one side of the cut,
+	 * and v2 on the other. If the weight of the cut is less than 2, a new subtour cut has been found and added to the return set. The method
+	 * terminates as soon as all pairs v1, v2 have been tested.
+	 *
+	 * Note: if you are only interested in the single most violated subtour cut, use {@link #separateSubtour(Map)} instead; this method is
+	 * significantly faster!
+	 * Note 2: the average runtime complexity of this method is significantly higher than {@link #separateSubtours(Map, int)}.
+	 *
+	 * The implementation of this method relies on jgrapht's Push Relabel Maximum Flow implementation with runtime O(V^3).
+	 * Runtime: O(V^4).
+	 *
+	 * @param edgeValueMap Mapping of edges to their corresponding values, i.e. the x_e variable values for all e \in E. It suffices to provide the values
+	 *                     of the non-zero edges. All other edges are presumed to have the value 0.
+	 * @param maxNumberOfSubtours The maximum number of subtours returned.
+	 * @return Returns at most {@code maxNumberOfSubtours} subtour cuts, or an empty list whenever there are no subtours.
+	 */
+	public Set<SubtourCut<V>> separateMostViolatedSubtours(Map<E, Double> edgeValueMap, int maxNumberOfSubtours){
+		//Update the weights of our working graph
+		//a. Reset all weights to zero
+		for(DefaultWeightedEdge edge : workingGraph.edgeSet())
+			workingGraph.setEdgeWeight(edge, 0);
+
+		//b. Update the edge values with the values supplied in the edgeValueMap
+		for(Map.Entry<E, Double> entry : edgeValueMap.entrySet()){
+			if(entry.getValue() > PRECISION){
+				V i=inputGraph.getEdgeSource(entry.getKey());
+				V j=inputGraph.getEdgeTarget(entry.getKey());
+				DefaultWeightedEdge edge = workingGraph.getEdge(i,j);
+				workingGraph.setEdgeWeight(edge, entry.getValue() + workingGraph.getEdgeWeight(edge));
+			}
+		}
+
+//		System.out.println("Working graph:");
+//		for(DefaultWeightedEdge edge : workingGraph.edgeSet()){
+//			System.out.println(""+edge+" weight: "+workingGraph.getEdgeWeight(edge));
+//		}
+
+		//c. Calculate the subtour cuts
+		TreeSet<SubtourCut<V>> subtourCuts =new TreeSet<>((s1, s2) -> Double.compare(s1.getCutValue(), s2.getCutValue()));
+
+		MinimumSTCutAlgorithm<V, DefaultWeightedEdge> mssc=new PushRelabelMFImpl<>(workingGraph, PRECISION);
+		Iterator<V> it=workingGraph.vertexSet().iterator();
+		V source=it.next();
+
+		while (it.hasNext()){
+			V target=it.next();
+//			System.out.println("Target: "+target);
+			double cutWeight=mssc.calculateMinCut(source, target);
+//			System.out.println("cutWeight: "+cutWeight+" sourcePartition: "+mssc.getSourcePartition()+" sinkPartition: "+mssc.getSinkPartition());
+
+			//If the cut value is smaller than 2, a subtour cut has been found
+			if(cutWeight<2-PRECISION) {
+				subtourCuts.add(new SubtourCut<>(mssc.getSourcePartition(), cutWeight));
+				if(subtourCuts.size() > maxNumberOfSubtours)
+					subtourCuts.pollLast();
+			}
+		}
+		hasSubtour= !subtourCuts.isEmpty();
+		return subtourCuts;
 	}
 
 	/**
-	 * Returns whether a subtour exists in the fractional TSP solution
-	 * @return whether a subtour exists in the fractional TSP solution
+	 * Returns true when the last invocation of one of the separation methods returned one or more subtours.
+	 * @return true when the last invocation of one of the separation methods returned one or more subtours, false otherwise
 	 */
 	@Deprecated
 	public boolean hasSubtour(){
@@ -190,8 +257,8 @@ public class SubtourSeparator<V, E> {
 	}
 	
 	/**
-	 * Returns \sum_{e\in \delta{S'}} x_e for the separated subtour through S'.
-	 * @return \sum_{e\in \delta{S'}} x_e for the separated subtour through S'.
+	 * Returns the value of the minimum cut, i.e., {@code \sum_{e\in \delta{S'}} x_e}.
+	 * @return the value of the minimum cut.
 	 */
 	@Deprecated
 	public double getCutValue(){
@@ -212,44 +279,5 @@ public class SubtourSeparator<V, E> {
 
 
 
-	public class SeparatedSubtour<V>{
-		private Set<V> cutSet;
-		private double cutValue;
 
-		public SeparatedSubtour(Set<V> cutSet, double cutValue){
-			this.cutSet=cutSet;
-			this.cutValue=cutValue;
-		}
-
-		/**
-		 * Returns \sum_{e\in \delta{S'}} x_e for the separated subtour through S'.
-		 * @return \sum_{e\in \delta{S'}} x_e for the separated subtour through S'.
-		 */
-		public double getCutValue(){
-			return cutValue;
-		}
-
-		/**
-		 * Returns the set S' where {@code \sum_{e\in \delta{S'}} x_e <2, S'\subset V, S' \noteq \emptyset}
-		 * @return the set S' where {@code \sum_{e\in \delta{S'}} x_e <2, S'\subset V, S' \noteq \emptyset}
-		 */
-		public Set<V> getCutSet(){
-			return cutSet;
-		}
-
-		@Override
-		public int hashCode(){
-			return cutSet.hashCode();
-		}
-
-		@Override
-		public boolean equals(Object o){
-			if(this==o)
-				return true;
-			else if(!(o instanceof SeparatedSubtour))
-				return false;
-			SeparatedSubtour<V> other=(SeparatedSubtour<V>)o;
-			return this.cutSet.equals(other.getCutSet());
-		}
-	}
 }

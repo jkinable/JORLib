@@ -26,10 +26,7 @@
  */
 package org.jorlib.alg.tsp.separation;
 
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Map;
+import java.util.*;
 
 import org.jgrapht.Graph;
 import org.jgrapht.Graphs;
@@ -56,7 +53,7 @@ public final class SubtourSeparatorTest extends TestCase{
 	public void testUndirectedGraphWithSubtour(){
 		//Define a new Undirected Graph. For simplicity we'll use a simple, unweighted graph, but in reality this class is mainly used
 		//in combination with weighted graphs for TSP problems.
-		Graph<Integer, DefaultEdge> undirectedGraph=new SimpleGraph<Integer, DefaultEdge>(DefaultEdge.class);
+		Graph<Integer, DefaultEdge> undirectedGraph=new SimpleGraph<>(DefaultEdge.class);
 		Graphs.addAllVertices(undirectedGraph, Arrays.asList(1,2,3,4,5,6));
 		undirectedGraph.addEdge(1, 2);
 		undirectedGraph.addEdge(2, 3);
@@ -69,7 +66,7 @@ public final class SubtourSeparatorTest extends TestCase{
 		undirectedGraph.addEdge(3, 6);
 		
 		//Define the x_e values for every edge e\in E
-		Map<DefaultEdge, Double> edgeValueMap=new HashMap<DefaultEdge, Double>();
+		Map<DefaultEdge, Double> edgeValueMap=new HashMap<>();
 		edgeValueMap.put(undirectedGraph.getEdge(1,2), 0.0);
 		edgeValueMap.put(undirectedGraph.getEdge(2,3), 1.0);
 		edgeValueMap.put(undirectedGraph.getEdge(3,4), 0.0);
@@ -81,12 +78,15 @@ public final class SubtourSeparatorTest extends TestCase{
 		edgeValueMap.put(undirectedGraph.getEdge(3,6), 1.0);
 		
 		//Invoke the separator
-		SubtourSeparator<Integer, DefaultEdge> separator=new SubtourSeparator<Integer, DefaultEdge>(undirectedGraph);
-		separator.separateSubtour(edgeValueMap);
+		SubtourSeparator<Integer, DefaultEdge> separator=new SubtourSeparator<>(undirectedGraph);
+		SubtourCut<Integer> subtour=separator.separateSubtour(edgeValueMap);
 		
-		assertTrue(separator.hasSubtour());
-		assertEquals(0, separator.getCutValue(), PRECISION);
-		assertEquals(new HashSet<Integer>(Arrays.asList(2,3,6)), separator.getCutSet());
+		assertTrue(subtour!=null);
+		assertEquals(0, subtour.getCutValue(), PRECISION);
+		assertEquals(new HashSet<>(Arrays.asList(2,3,6)), subtour.getCutSet());
+
+		Set<SubtourCut<Integer>> subtours=separator.separateSubtours(edgeValueMap, Integer.MAX_VALUE);
+		assertTrue(subtours.contains(new SubtourCut<>(new HashSet<>(Arrays.asList(2,3,6)), 0)));
 	}
 	
 	/**
@@ -95,7 +95,7 @@ public final class SubtourSeparatorTest extends TestCase{
 	public void testUndirectedGraphWithoutSubtour(){
 		//Define a new Undirected Graph. For simplicity we'll use a simple, unweighted graph, but in reality this class is mainly used
 		//in combination with weighted graphs for TSP problems.
-		Graph<Integer, DefaultEdge> undirectedGraph=new SimpleGraph<Integer, DefaultEdge>(DefaultEdge.class);
+		Graph<Integer, DefaultEdge> undirectedGraph=new SimpleGraph<>(DefaultEdge.class);
 		Graphs.addAllVertices(undirectedGraph, Arrays.asList(1,2,3,4,5,6));
 		undirectedGraph.addEdge(1, 2);
 		undirectedGraph.addEdge(2, 3);
@@ -108,7 +108,7 @@ public final class SubtourSeparatorTest extends TestCase{
 		undirectedGraph.addEdge(3, 6);
 		
 		//Define the x_e values for every edge e\in E
-		Map<DefaultEdge, Double> edgeValueMap=new HashMap<DefaultEdge, Double>();
+		Map<DefaultEdge, Double> edgeValueMap=new HashMap<>();
 		edgeValueMap.put(undirectedGraph.getEdge(1,2), 1.0);
 		edgeValueMap.put(undirectedGraph.getEdge(2,3), 0.0);
 		edgeValueMap.put(undirectedGraph.getEdge(3,4), 1.0);
@@ -120,11 +120,12 @@ public final class SubtourSeparatorTest extends TestCase{
 		edgeValueMap.put(undirectedGraph.getEdge(3,6), 1.0);
 		
 		//Invoke the separator
-		SubtourSeparator<Integer, DefaultEdge> separator=new SubtourSeparator<Integer, DefaultEdge>(undirectedGraph);
-		separator.separateSubtour(edgeValueMap);
-		
-		assertFalse(separator.hasSubtour());
-		assertEquals(2, separator.getCutValue(), PRECISION);
+		SubtourSeparator<Integer, DefaultEdge> separator=new SubtourSeparator<>(undirectedGraph);
+		SubtourCut<Integer> subtour=separator.separateSubtour(edgeValueMap);
+		assertTrue(subtour == null);
+
+		Set<SubtourCut<Integer>> subtours=separator.separateSubtours(edgeValueMap, Integer.MAX_VALUE);
+		assertTrue(subtours.isEmpty());
 	}
 	
 	/**
@@ -132,7 +133,7 @@ public final class SubtourSeparatorTest extends TestCase{
 	 */
 	public void testDirectedGraphWithSubtour(){
 		//Define a new Directed Graph. For simplicity we'll use a simple, unweighted graph.
-		Graph<Integer, DefaultEdge> directedGraph=new SimpleDirectedGraph<Integer, DefaultEdge>(DefaultEdge.class);
+		Graph<Integer, DefaultEdge> directedGraph=new SimpleDirectedGraph<>(DefaultEdge.class);
 		Graphs.addAllVertices(directedGraph, Arrays.asList(1,2,3,4,5,6));
 		directedGraph.addEdge(1, 2);
 		directedGraph.addEdge(2, 3);
@@ -147,7 +148,7 @@ public final class SubtourSeparatorTest extends TestCase{
 		directedGraph.addEdge(3, 6);
 		
 		//Define the x_e values for every edge e\in E
-		Map<DefaultEdge, Double> edgeValueMap=new HashMap<DefaultEdge, Double>();
+		Map<DefaultEdge, Double> edgeValueMap=new HashMap<>();
 		edgeValueMap.put(directedGraph.getEdge(1,2), 0.0);
 		edgeValueMap.put(directedGraph.getEdge(2,3), 1.0);
 		edgeValueMap.put(directedGraph.getEdge(3,4), 0.0);
@@ -161,11 +162,15 @@ public final class SubtourSeparatorTest extends TestCase{
 		edgeValueMap.put(directedGraph.getEdge(3,6), 1.0);
 		
 		//Invoke the separator
-		SubtourSeparator<Integer, DefaultEdge> separator=new SubtourSeparator<Integer, DefaultEdge>(directedGraph);
-		separator.separateSubtour(edgeValueMap);
+		SubtourSeparator<Integer, DefaultEdge> separator=new SubtourSeparator<>(directedGraph);
+		SubtourCut subtour=separator.separateSubtour(edgeValueMap);
 		
-		assertTrue(separator.hasSubtour());
-		assertEquals(0, separator.getCutValue(), PRECISION);
-		assertEquals(new HashSet<Integer>(Arrays.asList(2,3,6)), separator.getCutSet());
+		assertTrue(subtour!=null);
+		assertEquals(0, subtour.getCutValue(), PRECISION);
+		assertEquals(new HashSet<>(Arrays.asList(2,3,6)), subtour.getCutSet());
+
+		Set<SubtourCut<Integer>> subtours=separator.separateSubtours(edgeValueMap, Integer.MAX_VALUE);
+		System.out.println("Subtours: "+subtours);
+		assertTrue(subtours.contains(new SubtourCut<>(new HashSet<>(Arrays.asList(2,3,6)), 0)));
 	}
 }

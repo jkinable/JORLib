@@ -31,6 +31,7 @@ import ilog.concert.IloLinearNumExpr;
 import ilog.concert.IloNumVar;
 import ilog.concert.IloRange;
 import org.jgrapht.graph.DefaultWeightedEdge;
+import org.jorlib.alg.tsp.separation.SubtourCut;
 import org.jorlib.alg.tsp.separation.SubtourSeparator;
 import org.jorlib.demo.frameworks.columnGeneration.tspCG.cg.Matching;
 import org.jorlib.demo.frameworks.columnGeneration.tspCG.cg.PricingProblemByColor;
@@ -75,9 +76,9 @@ public final class SubtourInequalityGenerator extends AbstractCutGenerator<TSP, 
 	@Override
 	public List<AbstractInequality> generateInqualities() {
 		//Check for violated subtours. When found, generate an inequality
-		separator.separateSubtour(masterData.edgeValueMap);
-		if(separator.hasSubtour()){
-			Set<Integer> cutSet=separator.getCutSet();
+		SubtourCut<Integer> subtour=separator.separateSubtour(masterData.edgeValueMap);
+		if(subtour!=null){
+			Set<Integer> cutSet=subtour.getCutSet();
 			SubtourInequality inequality=new SubtourInequality(this, cutSet);
 			this.addCut(inequality);
 			return Collections.singletonList(inequality);
